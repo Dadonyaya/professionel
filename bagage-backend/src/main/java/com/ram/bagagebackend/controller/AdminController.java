@@ -8,6 +8,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
 import java.util.*;
 
@@ -27,30 +31,47 @@ public class AdminController {
         return false;
     }
 
-    // 1. Lister tous les utilisateurs/staff
+    // 1. Lister les utilisateurs/staff avec pagination côté serveur
     @GetMapping("/users")
-    public ResponseEntity<?> listUsers() throws FirebaseAuthException {
-        if (!isAdmin()) return ResponseEntity.status(403).body("Accès refusé");
-        List<Map<String, Object>> all = new ArrayList<>();
+    public ResponseEntity<Page<Map<String, Object>>> listUsers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size,
+            @RequestParam(required = false) String type) throws FirebaseAuthException {
+        if (!isAdmin()) return ResponseEntity.status(403).body(null);
 
-        ListUsersPage page = FirebaseAuth.getInstance().listUsers(null);
-        for (ExportedUserRecord user : page.iterateAll()) {
+        List<Map<String, Object>> all = new ArrayList<>();
+        ListUsersPage firebasePage = FirebaseAuth.getInstance().listUsers(null);
+        for (ExportedUserRecord user : firebasePage.iterateAll()) {
             Map<String, Object> info = new HashMap<>();
             info.put("uid", user.getUid());
             info.put("email", user.getEmail());
             info.put("type", (user.getEmail() != null && user.getEmail().toLowerCase().startsWith("ram")) ? "staff" : "user");
 
-            // Ajouter nom/prenom/badge si dispo en BDD
-            Optional<Utilisateur> utilisateurOpt = utilisateurRepository.findByEmailIgnoreCase(user.getEmail());
-            utilisateurOpt.ifPresent(utilisateur -> {
-                info.put("nom", utilisateur.getNom());
-                info.put("prenom", utilisateur.getPrenom());
+            Optional<Utilisateur> opt = utilisateurRepository.findByEmailIgnoreCase(user.getEmail());
+            opt.ifPresent(u -> {
+                info.put("nom", u.getNom());
+                info.put("prenom", u.getPrenom());
                 info.put("badge", user.getEmail().split("@")[0]);
             });
 
             all.add(info);
         }
-        return ResponseEntity.ok(all);
+
+        if (type != null) {
+            String lower = type.toLowerCase();
+            all.removeIf(u -> {
+                boolean isStaff = "staff".equals(u.get("type"));
+                return lower.equals("staff") ? !isStaff : lower.equals("user") && isStaff;
+            });
+        }
+
+        int start = page * size;
+        int end = Math.min(start + size, all.size());
+        List<Map<String, Object>> sub = start >= end ? Collections.emptyList() : all.subList(start, end);
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Map<String, Object>> result = new PageImpl<>(sub, pageable, all.size());
+
+        return ResponseEntity.ok(result);
     }
 
     // 2. Créer un compte staff (Firebase + MySQL)

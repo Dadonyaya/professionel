@@ -32,11 +32,10 @@ export default function DetailVoyagePage() {
   const fetchDetails = async () => {
     try {
       const token = await auth.currentUser.getIdToken();
-      const allVoyages = await axios.get(`${BACKEND_URL}/voyages/staff`, {
+      const voyageRes = await axios.get(`${BACKEND_URL}/voyages/staff/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const selected = allVoyages.data.find(v => String(v.id) === String(id));
-      setVoyage(selected);
+      setVoyage(voyageRes.data);
 
       const bagageRes = await axios.get(`${BACKEND_URL}/bagages/staff/voyage/${id}`, {
         headers: { Authorization: `Bearer ${token}` }

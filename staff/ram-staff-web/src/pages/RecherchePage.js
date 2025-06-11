@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { BACKEND_URL, auth } from '../firebase';
-import { MagnifyingGlassIcon, ArrowRightCircleIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, ArrowRightCircleIcon, ChevronLeftIcon, ChevronRightIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
 function FadeInDiv({ children, delay = 0, className = "" }) {
   return (
@@ -23,104 +23,43 @@ const ITEMS_PER_PAGE = 5;
 
 export default function RecherchePage() {
   const [voyages, setVoyages] = useState([]);
-  const [filtered, setFiltered] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
-
-  // Nouvelles states pour les filtres
-  const [filterPNR, setFilterPNR] = useState('');
-  const [filterNom, setFilterNom] = useState('');
-  const [filterVilleDepart, setFilterVilleDepart] = useState('');
-  const [filterVilleArrivee, setFilterVilleArrivee] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPageCount, setTotalPageCount] = useState(1);
 
-  // Fonction pour fetch les voyages
+  // Fonction pour fetch les voyages (pagination & recherche côté serveur)
   const fetchVoyages = async () => {
     const user = auth.currentUser;
     if (!user) return;
     try {
       const token = await user.getIdToken();
       const res = await axios.get(`${BACKEND_URL}/voyages/staff`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
+        params: { page: currentPage - 1, size: ITEMS_PER_PAGE, search }
       });
-      setVoyages(res.data);
-      // filtre combiné intelligent
-      setFiltered(applyAllFilters(res.data));
+      setVoyages(res.data.content);
+      setTotalPageCount(res.data.totalPages || 1);
     } catch (err) {
       setVoyages([]);
-      setFiltered([]);
       console.error("❌ Erreur fetch voyages :", err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Applique tous les filtres + recherche
-  function applyAllFilters(data) {
-    let result = data;
-    // Recherche principale (intelligente)
-    if (search) {
-      const lower = search.toLowerCase();
-      result = result.filter(v =>
-        (v.pnr && v.pnr.toLowerCase().includes(lower)) ||
-        (v.numeroVol && v.numeroVol.toLowerCase().includes(lower)) ||
-        (v.nom && v.nom.toLowerCase().includes(lower)) ||
-        (v.prenom && v.prenom.toLowerCase().includes(lower)) ||
-        (v.villeDepart && v.villeDepart.toLowerCase().includes(lower)) ||
-        (v.villeArrivee && v.villeArrivee.toLowerCase().includes(lower))
-      );
-    }
-    // Filtres spécifiques
-    if (filterPNR) {
-      const lower = filterPNR.toLowerCase();
-      result = result.filter(v => v.pnr && v.pnr.toLowerCase().includes(lower));
-    }
-    if (filterNom) {
-      const lower = filterNom.toLowerCase();
-      result = result.filter(v =>
-        (v.nom && v.nom.toLowerCase().includes(lower)) ||
-        (v.prenom && v.prenom.toLowerCase().includes(lower))
-      );
-    }
-    if (filterVilleDepart) {
-      const lower = filterVilleDepart.toLowerCase();
-      result = result.filter(v =>
-        v.villeDepart && v.villeDepart.toLowerCase().includes(lower)
-      );
-    }
-    if (filterVilleArrivee) {
-      const lower = filterVilleArrivee.toLowerCase();
-      result = result.filter(v =>
-        v.villeArrivee && v.villeArrivee.toLowerCase().includes(lower)
-      );
-    }
-    return result;
-  }
-
-  // Effet : fetch data
+  // Effet : fetch data au chargement puis lors des changements de page ou recherche
   useEffect(() => {
     fetchVoyages();
     const interval = setInterval(fetchVoyages, 5000);
     return () => clearInterval(interval);
     // eslint-disable-next-line
-  }, []);
+  }, [currentPage, search]);
 
-  // Effet : appliquer les filtres (recherche et champs)
-  useEffect(() => {
-    setFiltered(applyAllFilters(voyages));
+  const handleSearch = (value) => {
+    setSearch(value);
     setCurrentPage(1);
-    // eslint-disable-next-line
-  }, [search, filterPNR, filterNom, filterVilleDepart, filterVilleArrivee, voyages]);
-
-  // Pagination
-  const totalPageCount = Math.ceil(filtered.length / ITEMS_PER_PAGE);
-  const paginated = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-
-  const handleSearch = (value) => setSearch(value);
-  const handlePNR = (e) => setFilterPNR(e.target.value);
-  const handleNom = (e) => setFilterNom(e.target.value);
-  const handleVilleDepart = (e) => setFilterVilleDepart(e.target.value);
-  const handleVilleArrivee = (e) => setFilterVilleArrivee(e.target.value);
+  };
 
   return (
     <div
@@ -168,8 +107,13 @@ export default function RecherchePage() {
               style={{ backgroundColor: '#C4002A', opacity: 0.12 }}
             />
           </div>
-          <div className="text-xs text-gray-400 font-normal select-none px-3 py-1" style={{ fontFamily: 'Montserrat, Arial, sans-serif' }}>
-            {filtered.length} vol{filtered.length > 1 ? 's' : ''} trouvé{filtered.length > 1 ? 's' : ''}
+          <div className="flex items-center gap-2">
+            <div className="text-xs text-gray-400 font-normal select-none px-3 py-1" style={{ fontFamily: 'Montserrat, Arial, sans-serif' }}>
+              {voyages.length} vol{voyages.length > 1 ? 's' : ''} trouvé{voyages.length > 1 ? 's' : ''}
+            </div>
+            <button type="button" onClick={fetchVoyages} className="p-1 text-gray-400 hover:text-gray-600 transition" aria-label="Rafraîchir">
+              <ArrowPathIcon className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </FadeInDiv>
@@ -207,45 +151,7 @@ export default function RecherchePage() {
               }}
             />
           </div>
-          {/* Filtres séparés */}
-          <div className="flex flex-wrap gap-2 mt-1 max-w-3xl">
-  <input
-    type="text"
-    value={filterPNR}
-    onChange={handlePNR}
-    placeholder="PNR"
-    className="px-3 py-[6px] border border-[#ececec] rounded bg-white text-[15px] outline-none focus:border-ramRed transition"
-    style={{ minWidth: 100, fontFamily: 'Montserrat, Arial, sans-serif' }}
-    spellCheck={false}
-  />
-  <input
-    type="text"
-    value={filterNom}
-    onChange={handleNom}
-    placeholder="Nom de famille"
-    className="px-3 py-[6px] border border-[#ececec] rounded bg-white text-[15px] outline-none focus:border-ramRed transition"
-    style={{ minWidth: 120, fontFamily: 'Montserrat, Arial, sans-serif' }}
-    spellCheck={false}
-  />
-  <input
-    type="text"
-    value={filterVilleDepart}
-    onChange={handleVilleDepart}
-    placeholder="Ville de départ"
-    className="px-3 py-[6px] border border-[#ececec] rounded bg-white text-[15px] outline-none focus:border-ramRed transition"
-    style={{ minWidth: 120, fontFamily: 'Montserrat, Arial, sans-serif' }}
-    spellCheck={false}
-  />
-  <input
-    type="text"
-    value={filterVilleArrivee}
-    onChange={handleVilleArrivee}
-    placeholder="destination"
-    className="px-3 py-[6px] border border-[#ececec] rounded bg-white text-[15px] outline-none focus:border-ramRed transition"
-    style={{ minWidth: 120, fontFamily: 'Montserrat, Arial, sans-serif' }}
-    spellCheck={false}
-  />
-</div>
+          {/* Filtres supprimés : pagination et recherche sont gérées côté serveur */}
         </div>
       </FadeInDiv>
 
@@ -281,14 +187,14 @@ export default function RecherchePage() {
                       Chargement...
                     </td>
                   </tr>
-                ) : paginated.length === 0 ? (
+                ) : voyages.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="py-16 text-center text-[#b1afaf] italic">
                       Aucun vol trouvé.
                     </td>
                   </tr>
                 ) : (
-                  paginated.map((v, i) => (
+                  voyages.map((v, i) => (
                     <tr
                       key={v.id}
                       className={`

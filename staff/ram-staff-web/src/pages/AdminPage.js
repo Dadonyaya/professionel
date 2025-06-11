@@ -29,7 +29,12 @@ function FadeInDiv({ children, delay = 0, className = "" }) {
 const ITEMS_PER_PAGE = 5;
 
 export default function AdminPage() {
-  const [users, setUsers] = useState([]);
+  const [staffUsers, setStaffUsers] = useState([]);
+  const [normalUsers, setNormalUsers] = useState([]);
+  const [staffTotalPages, setStaffTotalPages] = useState(1);
+  const [userTotalPages, setUserTotalPages] = useState(1);
+  const [staffCount, setStaffCount] = useState(0);
+  const [userCount, setUserCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [badge, setBadge] = useState('');
@@ -56,15 +61,37 @@ export default function AdminPage() {
     checkAdmin();
   }, []);
 
+  const fetchStaff = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const res = await axios.get(`${BACKEND_URL}/admin/users`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { page: staffPage - 1, size: ITEMS_PER_PAGE, type: 'staff' }
+      });
+      setStaffUsers(res.data.content);
+      setStaffTotalPages(res.data.totalPages || 1);
+      setStaffCount(res.data.totalElements || 0);
+    } catch {
+      setError('Erreur lors du chargement des utilisateurs');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchUsers = async () => {
     setLoading(true);
     setError('');
     try {
       const token = await auth.currentUser.getIdToken();
       const res = await axios.get(`${BACKEND_URL}/admin/users`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
+        params: { page: userPage - 1, size: ITEMS_PER_PAGE, type: 'user' }
       });
-      setUsers(res.data);
+      setNormalUsers(res.data.content);
+      setUserTotalPages(res.data.totalPages || 1);
+      setUserCount(res.data.totalElements || 0);
     } catch {
       setError('Erreur lors du chargement des utilisateurs');
     } finally {
@@ -73,8 +100,11 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
-    if (isAdmin) fetchUsers();
-  }, [isAdmin]);
+    if (isAdmin) {
+      fetchStaff();
+      fetchUsers();
+    }
+  }, [isAdmin, staffPage, userPage]);
 
   const handleCreateStaff = async (e) => {
     e.preventDefault();
@@ -104,25 +134,13 @@ export default function AdminPage() {
       setConfirmPassword('');
       setNom('');
       setPrenom('');
-      await fetchUsers();
+      await Promise.all([fetchStaff(), fetchUsers()]);
     } catch (e) {
       setError(e.response?.data || 'Erreur lors de la création');
     } finally {
       setCreating(false);
       setShowPassword(false);
     }
-  };
-
-  const isStaffUser = (user) => {
-    if (!user) return false;
-    if (user.type === 'staff') return true;
-    const lower = user.email?.toLowerCase() || '';
-    return lower.startsWith('ram') || lower.startsWith('admin');
-  };
-
-  const getNamesByEmail = (email) => {
-    const found = users.find(u => u.email && u.email.toLowerCase() === email.toLowerCase());
-    return { prenom: found?.prenom || '', nom: found?.nom || '' };
   };
 
   if (!isAdmin) {
@@ -133,20 +151,6 @@ export default function AdminPage() {
     );
   }
 
-  const staffUsers = users.filter(u => isStaffUser(u));
-  const normalUsers = users.filter(u => !isStaffUser(u));
-
-  const staffTotalPages = Math.ceil(staffUsers.length / ITEMS_PER_PAGE) || 1;
-  const paginatedStaff = staffUsers.slice(
-    (staffPage - 1) * ITEMS_PER_PAGE,
-    staffPage * ITEMS_PER_PAGE
-  );
-
-  const userTotalPages = Math.ceil(normalUsers.length / ITEMS_PER_PAGE) || 1;
-  const paginatedUsers = normalUsers.slice(
-    (userPage - 1) * ITEMS_PER_PAGE,
-    userPage * ITEMS_PER_PAGE
-  );
 
   return (
     <div
@@ -196,7 +200,7 @@ export default function AdminPage() {
             className="text-xs text-gray-400 font-normal select-none px-3 py-1"
             style={{ fontFamily: 'Montserrat, Arial, sans-serif' }}
           >
-            {users.length} utilisateur{users.length > 1 ? 's' : ''} total
+            {staffCount + userCount} utilisateur{staffCount + userCount > 1 ? 's' : ''} total
           </div>
         </div>
       </FadeInDiv>
@@ -225,7 +229,7 @@ export default function AdminPage() {
                     </tr>
                   </thead>
                   <tbody>
-                  {paginatedStaff.map(u => (
+                  {staffUsers.map(u => (
                     <tr
                       key={u.uid}
                       className="border-b border-[#ececec] bg-white hover:bg-[#F8E6EA]/55 cursor-default transition-colors"
@@ -303,21 +307,14 @@ export default function AdminPage() {
                     </tr>
                   </thead>
                   <tbody>
-                  {paginatedUsers.map(u => (
+                  {normalUsers.map(u => (
                     <tr
                       key={u.uid}
                       className="border-b border-[#ececec] bg-white hover:bg-[#F8E6EA]/55 cursor-default transition-colors"
                       style={{ transition: 'background 0.14s cubic-bezier(0.23, 1, 0.32, 1)' }}
                     >
-                      {(() => {
-                        const info = getNamesByEmail(u.email);
-                        return (
-                          <>
-                            <td className="py-2 px-4">{info.prenom}</td>
-                            <td className="py-2 px-4">{info.nom}</td>
-                          </>
-                        );
-                      })()}
+                      <td className="py-2 px-4">{u.prenom || ''}</td>
+                      <td className="py-2 px-4">{u.nom || ''}</td>
                       <td className="py-2 px-4 truncate">{u.email}</td>
                       <td className="py-2 px-4 font-mono text-xs select-all relative">
                         <span className="inline-block pr-7">
