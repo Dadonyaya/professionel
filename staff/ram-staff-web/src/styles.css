@@ -1,0 +1,102 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base style pour le body */
+body {
+  font-family: 'Inter', 'Poppins', 'Segoe UI', Arial, sans-serif;
+  background-color: #f7f8fa;   /* même couleur que bgMain de ton theme Tailwind */
+  color: #23242c;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  font-size: 15.5px;
+}
+
+input, textarea, select, button {
+  font-family: inherit;
+}
+
+/* Sélection de texte doux */
+::selection {
+  background: #ffdbe4;
+}
+
+/* SUPPRESSION outlines/borders focus pour flat UI */
+input:focus, textarea:focus, select:focus, button:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+  background-color: inherit !important;
+}
+
+/* Animation fadeInUp */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(22px); }
+  to   { opacity: 1; transform: none; }
+}
+.animate-fadeInUp {
+  animation: fadeInUp 0.64s cubic-bezier(0.23,1,0.32,1) both;
+}
+
+/* Animation fadeIn */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-fadeIn {
+  animation: fadeIn 0.45s cubic-bezier(.23,1,.32,1) both;
+}
+
+/* Scrollbar fine et moderne */
+::-webkit-scrollbar {
+  width: 7px;
+  background: #f7f8fa;
+}
+::-webkit-scrollbar-thumb {
+  background: #ececec;
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #e3e3e3;
+}
+
+/* Placeholder couleur sobre */
+::placeholder {
+  color: #bcbcbc !important;
+  opacity: 1;
+}
+
+/* Petites transitions sur hover */
+tbody tr.group:hover, 
+tbody tr:hover {
+  transition: background 0.13s cubic-bezier(.4,0,.2,1);
+  background: #f8e9ef !important;
+}
+
+td, th {
+  transition: background 0.14s cubic-bezier(.4,0,.2,1), color 0.18s cubic-bezier(.4,0,.2,1);
+}
+
+/* Effet d'ombre subtile pour cards/tables */
+.shadow-subtle, .transition-shadow {
+  transition: box-shadow 0.21s cubic-bezier(.4,0,.2,1);
+}
+.transition-colors {
+  transition: color 0.16s, background 0.16s, border-color 0.17s cubic-bezier(.4,0,.2,1);
+}
+
+/* Pour éviter tout effet bleu sur focus visible */
+button:focus-visible, input:focus-visible {
+  outline: none !important;
+}
+
+/* Sur mobile, évite le zoom sur input */
+input, select, textarea {
+  font-size: 16px;
+}
+
+/* Pour que la sidebar reste 100% collée sans shadow parasite sur le côté gauche */
+.sidebar-shadow-fix {
+  box-shadow: none !important;
+  border-left: 0 !important;
+}
