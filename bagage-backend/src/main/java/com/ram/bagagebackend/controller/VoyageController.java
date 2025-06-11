@@ -61,9 +61,12 @@ public class VoyageController {
         return ResponseEntity.ok(voyage);
     }
 
-    // ✅ GET /voyages/staff (accès staff uniquement)
+    // ✅ GET /voyages/staff (accès staff uniquement) - paginé & recherche côté serveur
     @GetMapping("/staff")
-    public ResponseEntity<List<Voyage>> getAllVoyagesForStaff() {
+    public ResponseEntity<Page<Voyage>> getAllVoyagesForStaff(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size,
+            @RequestParam(required = false) String search) {
         FirebaseToken token = (FirebaseToken) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         String email = token.getEmail();
 
@@ -74,9 +77,27 @@ public class VoyageController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
-        List<Voyage> voyages = voyageRepository.findAll();
-        System.out.println("📦 STAFF : voyages récupérés = " + voyages.size());
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Voyage> voyages;
+        if (search != null && !search.isBlank()) {
+            String q = search.toLowerCase();
+            voyages = voyageRepository.search(q, pageable);
+        } else {
+            voyages = voyageRepository.findAll(pageable);
+        }
+
         return ResponseEntity.ok(voyages);
+    }
+
+    // ✅ GET /voyages/staff/{id} (détail d'un vol pour staff)
+    @GetMapping("/staff/{id}")
+    public ResponseEntity<Voyage> getVoyageStaffById(@PathVariable Long id) {
+        if (!isStaff()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        return voyageRepository.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     // ✅ POST /voyages/staff (ajout par staff, notifie SSE)
